@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data;
 using Oracle.ManagedDataAccess.Client;
 using System.Configuration;
 
@@ -7,7 +6,7 @@ namespace KumariCinemas
 {
     public partial class Default : System.Web.UI.Page
     {
-        private readonly string connStr = ConfigurationManager.ConnectionStrings["OracleDb"].ConnectionString;
+        private readonly string connectionString = ConfigurationManager.ConnectionStrings["OracleDb"].ConnectionString;
 
         protected void Page_Load(object sender, EventArgs e)
         {
@@ -16,7 +15,7 @@ namespace KumariCinemas
 
         private void LoadDashboard()
         {
-            using (var conn = new OracleConnection(connStr))
+            using (var conn = new OracleConnection(connectionString))
             {
                 conn.Open();
                 lblCustomers.Text = GetCount(conn, "CUSTOMER");
@@ -28,9 +27,9 @@ namespace KumariCinemas
             }
         }
 
-        private string GetCount(OracleConnection conn, string table)
+        private string GetCount(OracleConnection conn, string tableName)
         {
-            using (var cmd = new OracleCommand("SELECT COUNT(*) FROM " + table, conn))
+            using (var cmd = new OracleCommand("SELECT COUNT(*) FROM " + tableName, conn))
                 return cmd.ExecuteScalar().ToString();
         }
     }
