@@ -60,49 +60,76 @@ namespace KumariCinemas
         protected global::System.Web.UI.WebControls.Button btnCancel;
 
         /// <summary>
-        /// ddlCustomer control.
+        /// hiddenMovieId control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.DropDownList ddlCustomer;
+        protected global::System.Web.UI.WebControls.HiddenField hiddenMovieId;
 
         /// <summary>
-        /// ddlMovie control.
+        /// hiddenHallId control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.DropDownList ddlMovie;
+        protected global::System.Web.UI.WebControls.HiddenField hiddenHallId;
 
         /// <summary>
-        /// ddlTheater control.
+        /// hiddenTheaterId control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.DropDownList ddlTheater;
+        protected global::System.Web.UI.WebControls.HiddenField hiddenTheaterId;
 
         /// <summary>
-        /// ddlHall control.
+        /// dropShowtime control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.DropDownList ddlHall;
+        protected global::System.Web.UI.WebControls.DropDownList dropShowtime;
 
         /// <summary>
-        /// ddlShowtime control.
+        /// labelMovie control.
         /// </summary>
         /// <remarks>
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.DropDownList ddlShowtime;
+        protected global::System.Web.UI.WebControls.Label labelMovie;
+
+        /// <summary>
+        /// labelHall control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label labelHall;
+
+        /// <summary>
+        /// labelTheater control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label labelTheater;
+
+        /// <summary>
+        /// dropCustomer control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.DropDownList dropCustomer;
 
         /// <summary>
         /// txtSeat control.

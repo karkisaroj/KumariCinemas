@@ -110,25 +110,6 @@
             <div class="col-4 col-md-2"><a href="Tickets.aspx" class="quick-card"><i class="bi bi-ticket-perforated" style="color:#6a1b9a"></i><span>Tickets</span></a></div>
         </div>
     </div>
-    <div class="page-card">
-        <div class="section-title mb-3"><i class="bi bi-clock-history me-2"></i>Recent Ticket Bookings</div>
-        <div class="table-responsive">
-            <asp:GridView ID="gvRecent" runat="server" CssClass="table table-hover mb-0" AutoGenerateColumns="false" GridLines="None">
-                <Columns>
-                    <asp:TemplateField HeaderText="Ticket ID"><ItemTemplate><span class="badge-booked">#<%# Eval("TICKET_ID") %></span></ItemTemplate></asp:TemplateField>
-                    <asp:BoundField DataField="CUSTOMER_NAME" HeaderText="Customer"/>
-                    <asp:BoundField DataField="MOVIE_TITLE" HeaderText="Movie"/>
-                    <asp:BoundField DataField="THEATER_NAME" HeaderText="Theater"/>
-                    <asp:BoundField DataField="SEAT_NO" HeaderText="Seat"/>
-                    <asp:TemplateField HeaderText="Price"><ItemTemplate>Rs. <%# Eval("TICKET_PRICE") %></ItemTemplate></asp:TemplateField>
-                    <asp:TemplateField HeaderText="Status">
-                        <ItemTemplate><span class='<%# Eval("TICKET_STATUS").ToString()=="Booked"?"badge-booked":"badge-cancelled" %>'><%# Eval("TICKET_STATUS") %></span></ItemTemplate>
-                    </asp:TemplateField>
-                </Columns>
-                <EmptyDataTemplate><div class="text-center text-muted py-4">No tickets booked yet.</div></EmptyDataTemplate>
-            </asp:GridView>
-        </div>
-    </div>
 </div>
 </form>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
