@@ -81,6 +81,7 @@
                     <asp:TemplateField HeaderText="Hall Name"><ItemTemplate><div class="fw-semibold"><%# Eval("HALL_NAME") %></div></ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Capacity"><ItemTemplate><i class="bi bi-people text-muted me-1"></i><%# Eval("HALL_CAPACITY") %> seats</ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Type"><ItemTemplate><span class="badge-type"><%# Eval("HALL_TYPE") %></span></ItemTemplate></asp:TemplateField>
+                    <asp:TemplateField HeaderText="Theater"><ItemTemplate><i class="bi bi-building text-muted me-1"></i><%# Eval("THEATER_NAME") %></ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Actions">
                         <ItemTemplate>
                             <asp:Button runat="server" Text="Edit" CssClass="btn btn-edit-row me-1" CommandName="Edit"/>
@@ -110,6 +111,9 @@
                         <asp:ListItem>Standard</asp:ListItem><asp:ListItem>IMAX</asp:ListItem>
                         <asp:ListItem>4DX</asp:ListItem><asp:ListItem>Dolby</asp:ListItem><asp:ListItem>VIP</asp:ListItem>
                     </asp:DropDownList>
+                </div>
+                <div class="mb-3"><label class="form-label">Theater</label>
+                    <asp:DropDownList ID="ddlTheater" runat="server" CssClass="form-select"></asp:DropDownList>
                 </div>
             </div>
             <div class="modal-footer">

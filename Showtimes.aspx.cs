@@ -122,22 +122,6 @@ namespace KumariCinemas
                 {
                     conn.Open();
 
-                    // Validate that the selected hall belongs to the selected theater
-                    var cmdValidate = new OracleCommand(
-                        "SELECT COUNT(*) FROM HALL_THEATER_MOVIE_CUSTOMER WHERE HALL_ID=:hid AND THEATER_ID=:tid", conn);
-                    cmdValidate.Parameters.Add(":hid", OracleDbType.Int32).Value = int.Parse(ddlHall.SelectedValue);
-                    cmdValidate.Parameters.Add(":tid", OracleDbType.Int32).Value = int.Parse(ddlTheater.SelectedValue);
-                    int hallTheaterCount = Convert.ToInt32(cmdValidate.ExecuteScalar());
-
-                    if (hallTheaterCount == 0)
-                    {
-                        ShowAlert("The selected hall is not available in the selected theater. Please choose a valid hall-theater combination.", "warning");
-                        ShowModal = true;
-                        LoadDropdowns();
-                        LoadShowtimes();
-                        return;
-                    }
-
                     var showDate = DateTime.Parse(txtDate.Text);
                     var showTime = DateTime.Parse(txtDate.Text + " " + txtTime.Text);
                     var showEnd = DateTime.Parse(txtDate.Text + " " + txtEndTime.Text);

@@ -22,11 +22,48 @@ namespace KumariCinemas
             {
                 conn.Open();
                 var adapter = new OracleDataAdapter(
-                    "SELECT MOVIE_ID, MOVIE_TITLE, MOVIE_GENRE, MOVIE_DURATION, MOVIE_LANGUAGE, MOVIE_RELEASE_DATE FROM MOVIE ORDER BY MOVIE_ID", conn);
+                    "SELECT m.MOVIE_ID, m.MOVIE_TITLE, m.MOVIE_GENRE, m.MOVIE_DURATION, m.MOVIE_LANGUAGE, m.MOVIE_RELEASE_DATE, " +
+                    "NVL((SELECT LISTAGG(tname, ', ') WITHIN GROUP (ORDER BY tname) FROM " +
+                    "(SELECT DISTINCT t.THEATER_NAME AS tname FROM THEATER_MOVIE_CUSTOMER tmc " +
+                    "JOIN THEATER t ON tmc.THEATER_ID = t.THEATER_ID " +
+                    "WHERE tmc.MOVIE_ID = m.MOVIE_ID)), 'Not Assigned') AS THEATERS " +
+                    "FROM MOVIE m ORDER BY m.MOVIE_ID", conn);
                 var table = new DataTable();
                 adapter.Fill(table);
                 gvMovies.DataSource = table;
                 gvMovies.DataBind();
+            }
+        }
+
+        private void LoadTheaterCheckboxes(int movieId = 0)
+        {
+            using (var conn = new OracleConnection(connectionString))
+            {
+                conn.Open();
+                var da = new OracleDataAdapter(
+                    "SELECT THEATER_ID, THEATER_NAME FROM THEATER ORDER BY THEATER_NAME", conn);
+                var dt = new DataTable();
+                da.Fill(dt);
+                cblTheaters.DataSource = dt;
+                cblTheaters.DataTextField = "THEATER_NAME";
+                cblTheaters.DataValueField = "THEATER_ID";
+                cblTheaters.DataBind();
+
+                if (movieId > 0)
+                {
+                    // Check which theaters are already assigned to this movie
+                    var da2 = new OracleDataAdapter(
+                        "SELECT DISTINCT THEATER_ID FROM THEATER_MOVIE_CUSTOMER WHERE MOVIE_ID=:mid", conn);
+                    da2.SelectCommand.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+                    var assignedTable = new DataTable();
+                    da2.Fill(assignedTable);
+                    var assignedIds = new System.Collections.Generic.HashSet<string>();
+                    foreach (DataRow row in assignedTable.Rows)
+                        assignedIds.Add(row["THEATER_ID"].ToString());
+
+                    foreach (ListItem item in cblTheaters.Items)
+                        item.Selected = assignedIds.Contains(item.Value);
+                }
             }
         }
 
@@ -39,6 +76,7 @@ namespace KumariCinemas
             ddlGenre.SelectedIndex = 0;
             ddlLanguage.SelectedIndex = 0;
             lblModalTitle.Text = "Add Movie";
+            LoadTheaterCheckboxes();
             ShowModal = true;
             LoadMovieGrid();
         }
@@ -49,6 +87,7 @@ namespace KumariCinemas
                 ddlGenre.SelectedValue == "" || ddlLanguage.SelectedValue == "")
             {
                 ShowAlert("Please fill in all required fields.", "warning");
+                LoadTheaterCheckboxes(hfMovieId.Value == "0" ? 0 : int.Parse(hfMovieId.Value));
                 ShowModal = true; LoadMovieGrid(); return;
             }
 
@@ -56,6 +95,7 @@ namespace KumariCinemas
             if (!int.TryParse(txtDuration.Text.Trim(), out int duration) || duration <= 0)
             {
                 ShowAlert("Duration must be a positive number (e.g. 120 for 2 hours).", "warning");
+                LoadTheaterCheckboxes(hfMovieId.Value == "0" ? 0 : int.Parse(hfMovieId.Value));
                 ShowModal = true; LoadMovieGrid(); return;
             }
 
@@ -64,21 +104,26 @@ namespace KumariCinemas
                 using (var conn = new OracleConnection(connectionString))
                 {
                     conn.Open();
+                    int movieId;
                     if (hfMovieId.Value == "0") // adding new
                     {
                         var cmd = new OracleCommand(
                             "INSERT INTO MOVIE(MOVIE_ID, MOVIE_TITLE, MOVIE_GENRE, MOVIE_DURATION, MOVIE_LANGUAGE, MOVIE_RELEASE_DATE) " +
-                            "VALUES((SELECT NVL(MAX(MOVIE_ID),0)+1 FROM MOVIE), :title, :genre, :duration, :language, :rdate)", conn);
+                            "VALUES((SELECT NVL(MAX(MOVIE_ID),0)+1 FROM MOVIE), :title, :genre, :duration, :language, :rdate) " +
+                            "RETURNING MOVIE_ID INTO :newMovieId", conn);
                         cmd.Parameters.Add(":title", OracleDbType.Varchar2).Value = txtTitle.Text.Trim();
                         cmd.Parameters.Add(":genre", OracleDbType.Varchar2).Value = ddlGenre.SelectedValue;
                         cmd.Parameters.Add(":duration", OracleDbType.Int32).Value = duration;
                         cmd.Parameters.Add(":language", OracleDbType.Varchar2).Value = ddlLanguage.SelectedValue;
                         cmd.Parameters.Add(":rdate", OracleDbType.Date).Value = DateTime.Parse(txtReleaseDate.Text);
+                        cmd.Parameters.Add(":newMovieId", OracleDbType.Int32).Direction = System.Data.ParameterDirection.Output;
                         cmd.ExecuteNonQuery();
+                        movieId = Convert.ToInt32(cmd.Parameters[":newMovieId"].Value);
                         ShowAlert("Movie added successfully!", "success");
                     }
                     else // editing existing
                     {
+                        movieId = int.Parse(hfMovieId.Value);
                         var cmd = new OracleCommand(
                             "UPDATE MOVIE SET MOVIE_TITLE=:title, MOVIE_GENRE=:genre, MOVIE_DURATION=:duration, MOVIE_LANGUAGE=:language, MOVIE_RELEASE_DATE=:rdate " +
                             "WHERE MOVIE_ID=:id", conn);
@@ -87,13 +132,47 @@ namespace KumariCinemas
                         cmd.Parameters.Add(":duration", OracleDbType.Int32).Value = duration;
                         cmd.Parameters.Add(":language", OracleDbType.Varchar2).Value = ddlLanguage.SelectedValue;
                         cmd.Parameters.Add(":rdate", OracleDbType.Date).Value = DateTime.Parse(txtReleaseDate.Text);
-                        cmd.Parameters.Add(":id", OracleDbType.Int32).Value = int.Parse(hfMovieId.Value);
+                        cmd.Parameters.Add(":id", OracleDbType.Int32).Value = movieId;
                         cmd.ExecuteNonQuery();
                         ShowAlert("Movie updated successfully!", "success");
                     }
+
+                    // Save theater assignments for selected theaters
+                    var cmdMinCust = new OracleCommand("SELECT MIN(CUSTOMER_ID) FROM CUSTOMER", conn);
+                    var minCustObj = cmdMinCust.ExecuteScalar();
+                    if (minCustObj != DBNull.Value && minCustObj != null)
+                    {
+                        int minCustomerId = Convert.ToInt32(minCustObj);
+                        foreach (ListItem item in cblTheaters.Items)
+                        {
+                            if (item.Selected)
+                            {
+                                int theaterId = int.Parse(item.Value);
+
+                                // Ensure CUSTOMER_MOVIE entry exists
+                                var cmdCM = new OracleCommand(
+                                    @"MERGE INTO CUSTOMER_MOVIE cm USING (SELECT :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                                      ON (cm.MOVIE_ID = src.MOVIE_ID AND cm.CUSTOMER_ID = src.CUSTOMER_ID)
+                                      WHEN NOT MATCHED THEN INSERT (MOVIE_ID, CUSTOMER_ID) VALUES (src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+                                cmdCM.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+                                cmdCM.Parameters.Add(":cid", OracleDbType.Int32).Value = minCustomerId;
+                                cmdCM.ExecuteNonQuery();
+
+                                // Ensure THEATER_MOVIE_CUSTOMER entry exists
+                                var cmdTMC = new OracleCommand(
+                                    @"MERGE INTO THEATER_MOVIE_CUSTOMER tmc USING (SELECT :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                                      ON (tmc.THEATER_ID = src.THEATER_ID AND tmc.MOVIE_ID = src.MOVIE_ID AND tmc.CUSTOMER_ID = src.CUSTOMER_ID)
+                                      WHEN NOT MATCHED THEN INSERT (THEATER_ID, MOVIE_ID, CUSTOMER_ID) VALUES (src.THEATER_ID, src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+                                cmdTMC.Parameters.Add(":tid", OracleDbType.Int32).Value = theaterId;
+                                cmdTMC.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+                                cmdTMC.Parameters.Add(":cid", OracleDbType.Int32).Value = minCustomerId;
+                                cmdTMC.ExecuteNonQuery();
+                            }
+                        }
+                    }
                 }
             }
-            catch (Exception ex) { ShowAlert("Error: " + ex.Message, "danger"); ShowModal = true; }
+            catch (Exception ex) { ShowAlert("Error: " + ex.Message, "danger"); LoadTheaterCheckboxes(hfMovieId.Value == "0" ? 0 : int.Parse(hfMovieId.Value)); ShowModal = true; }
             LoadMovieGrid();
         }
 
@@ -126,6 +205,7 @@ namespace KumariCinemas
                     }
                 }
             }
+            LoadTheaterCheckboxes(id);
             gvMovies.EditIndex = -1;
             LoadMovieGrid();
         }

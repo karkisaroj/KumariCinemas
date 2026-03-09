@@ -86,6 +86,7 @@
                     <asp:TemplateField HeaderText="Duration"><ItemTemplate><i class="bi bi-clock text-muted me-1"></i><%# Eval("MOVIE_DURATION") %> mins</ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Language"><ItemTemplate><i class="bi bi-translate text-muted me-1"></i><%# Eval("MOVIE_LANGUAGE") %></ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Release Date"><ItemTemplate><i class="bi bi-calendar2 text-muted me-1"></i><%# Convert.ToDateTime(Eval("MOVIE_RELEASE_DATE")).ToString("dd MMM yyyy") %></ItemTemplate></asp:TemplateField>
+                    <asp:TemplateField HeaderText="Theaters"><ItemTemplate><i class="bi bi-building text-muted me-1"></i><%# Eval("THEATERS") %></ItemTemplate></asp:TemplateField>
                     <asp:TemplateField HeaderText="Actions">
                         <ItemTemplate>
                             <asp:Button runat="server" Text="Edit" CssClass="btn btn-edit-row me-1" CommandName="Edit"/>
@@ -128,6 +129,13 @@
                 <div class="row">
                     <div class="col-6 mb-3"><label class="form-label">Duration (mins)</label><asp:TextBox ID="txtDuration" runat="server" CssClass="form-control" TextMode="Number" placeholder="e.g. 120"></asp:TextBox></div>
                     <div class="col-6 mb-3"><label class="form-label">Release Date</label><asp:TextBox ID="txtReleaseDate" runat="server" CssClass="form-control" TextMode="Date"></asp:TextBox></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Assigned Theaters</label>
+                    <div class="border rounded p-2" style="max-height:130px;overflow-y:auto">
+                        <asp:CheckBoxList ID="cblTheaters" runat="server" RepeatLayout="Flow" CssClass="d-flex flex-column gap-1"></asp:CheckBoxList>
+                    </div>
+                    <small class="text-muted">Select theaters where this movie will be shown</small>
                 </div>
             </div>
             <div class="modal-footer">

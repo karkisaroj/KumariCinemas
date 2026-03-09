@@ -123,6 +123,15 @@ namespace KumariCinemas
         protected global::System.Web.UI.WebControls.TextBox txtReleaseDate;
 
         /// <summary>
+        /// cblTheaters control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.CheckBoxList cblTheaters;
+
+        /// <summary>
         /// btnCancelFooter control.
         /// </summary>
         /// <remarks>
