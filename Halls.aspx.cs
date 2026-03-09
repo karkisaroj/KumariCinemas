@@ -135,22 +135,97 @@ namespace KumariCinemas
                 using (var conn = new OracleConnection(connectionString))
                 {
                     conn.Open();
-
-                    // Block delete if hall is linked to any showtime
-                    var checkCmd = new OracleCommand(
-                        "SELECT COUNT(*) FROM \"ShowHallMovCust\" WHERE HALL_ID=:id", conn);
-                    checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    int showtimeCount = Convert.ToInt32(checkCmd.ExecuteScalar());
-
-                    if (showtimeCount > 0)
+                    using (var transaction = conn.BeginTransaction())
                     {
-                        ShowAlert("Cannot delete: this hall is used in " + showtimeCount + " showtime(s). Delete those showtimes first.", "warning");
-                        LoadHallGrid(); return;
-                    }
+                        try
+                        {
+                            // Collect ALL ticket IDs linked to this hall
+                            var cmdGetAllTickets = new OracleCommand(
+                                @"SELECT DISTINCT TICKET_ID FROM ""TktShowHallMovCust"" WHERE HALL_ID=:id", conn);
+                            cmdGetAllTickets.Transaction = transaction;
+                            cmdGetAllTickets.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            var allTicketIds = new System.Collections.Generic.List<int>();
+                            using (var reader = cmdGetAllTickets.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                    allTicketIds.Add(Convert.ToInt32(reader["TICKET_ID"]));
+                            }
 
-                    var cmd = new OracleCommand("DELETE FROM HALL WHERE HALL_ID=:id", conn);
-                    cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    cmd.ExecuteNonQuery();
+                            // Delete ALL TktShowHallMovCust rows for this hall
+                            var cmdDeleteAllTkt = new OracleCommand(
+                                @"DELETE FROM ""TktShowHallMovCust"" WHERE HALL_ID=:id", conn);
+                            cmdDeleteAllTkt.Transaction = transaction;
+                            cmdDeleteAllTkt.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdDeleteAllTkt.ExecuteNonQuery();
+
+                            // Delete the tickets
+                            foreach (var ticketId in allTicketIds)
+                            {
+                                var cmdDeleteTicket = new OracleCommand(
+                                    "DELETE FROM TICKET WHERE TICKET_ID=:tid", conn);
+                                cmdDeleteTicket.Transaction = transaction;
+                                cmdDeleteTicket.Parameters.Add(":tid", OracleDbType.Int32).Value = ticketId;
+                                cmdDeleteTicket.ExecuteNonQuery();
+                            }
+
+                            // Collect all SHOW_IDs linked to this hall
+                            var cmdGetShows = new OracleCommand(
+                                @"SELECT DISTINCT SHOW_ID FROM ""ShowHallMovCust"" WHERE HALL_ID=:id", conn);
+                            cmdGetShows.Transaction = transaction;
+                            cmdGetShows.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            var showIds = new System.Collections.Generic.List<int>();
+                            using (var reader = cmdGetShows.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                    showIds.Add(Convert.ToInt32(reader["SHOW_ID"]));
+                            }
+
+                            // Delete from ShowHallMovCust for this hall
+                            var cmdShowJunction = new OracleCommand(
+                                @"DELETE FROM ""ShowHallMovCust"" WHERE HALL_ID=:id", conn);
+                            cmdShowJunction.Transaction = transaction;
+                            cmdShowJunction.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdShowJunction.ExecuteNonQuery();
+
+                            // Delete orphaned showtimes
+                            foreach (var showId in showIds)
+                            {
+                                var cmdCheckShow = new OracleCommand(
+                                    @"SELECT COUNT(*) FROM ""ShowHallMovCust"" WHERE SHOW_ID=:sid", conn);
+                                cmdCheckShow.Transaction = transaction;
+                                cmdCheckShow.Parameters.Add(":sid", OracleDbType.Int32).Value = showId;
+                                int remaining = Convert.ToInt32(cmdCheckShow.ExecuteScalar());
+                                if (remaining == 0)
+                                {
+                                    var cmdDeleteShow = new OracleCommand(
+                                        "DELETE FROM SHOWTIME WHERE SHOW_ID=:sid", conn);
+                                    cmdDeleteShow.Transaction = transaction;
+                                    cmdDeleteShow.Parameters.Add(":sid", OracleDbType.Int32).Value = showId;
+                                    cmdDeleteShow.ExecuteNonQuery();
+                                }
+                            }
+
+                            // Delete from HALL_THEATER_MOVIE_CUSTOMER
+                            var cmdHallThr = new OracleCommand(
+                                "DELETE FROM HALL_THEATER_MOVIE_CUSTOMER WHERE HALL_ID=:id", conn);
+                            cmdHallThr.Transaction = transaction;
+                            cmdHallThr.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdHallThr.ExecuteNonQuery();
+
+                            // Finally delete the hall
+                            var cmd = new OracleCommand("DELETE FROM HALL WHERE HALL_ID=:id", conn);
+                            cmd.Transaction = transaction;
+                            cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmd.ExecuteNonQuery();
+
+                            transaction.Commit();
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
                     ShowAlert("Hall deleted successfully!", "success");
                 }
             }

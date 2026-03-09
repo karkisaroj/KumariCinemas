@@ -123,6 +123,7 @@
     <Content Include="Customers.aspx" />
     <Content Include="Default.aspx" />
     <Content Include="Halls.aspx" />
+    <Content Include="MovieOccupancyReport.aspx" />
     <Content Include="Movies.aspx" />
     <Content Include="Scripts\bootstrap.bundle.js" />
     <Content Include="Scripts\bootstrap.bundle.min.js" />
@@ -131,8 +132,10 @@
     <Content Include="Scripts\bootstrap.js" />
     <Content Include="Scripts\bootstrap.min.js" />
     <Content Include="Showtimes.aspx" />
+    <Content Include="TheaterMovieReport.aspx" />
     <Content Include="Theaters.aspx" />
     <Content Include="Tickets.aspx" />
+    <Content Include="UserTicketReport.aspx" />
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -157,6 +160,13 @@
     <Compile Include="Halls.aspx.designer.cs">
       <DependentUpon>Halls.aspx</DependentUpon>
     </Compile>
+    <Compile Include="MovieOccupancyReport.aspx.cs">
+      <DependentUpon>MovieOccupancyReport.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="MovieOccupancyReport.aspx.designer.cs">
+      <DependentUpon>MovieOccupancyReport.aspx</DependentUpon>
+    </Compile>
     <Compile Include="Movies.aspx.cs">
       <DependentUpon>Movies.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
@@ -168,6 +178,13 @@
     <Compile Include="Showtimes.aspx.cs">
       <DependentUpon>Showtimes.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="TheaterMovieReport.aspx.cs">
+      <DependentUpon>TheaterMovieReport.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="TheaterMovieReport.aspx.designer.cs">
+      <DependentUpon>TheaterMovieReport.aspx</DependentUpon>
     </Compile>
     <Compile Include="Theaters.aspx.cs">
       <DependentUpon>Theaters.aspx</DependentUpon>
@@ -182,6 +199,13 @@
     </Compile>
     <Compile Include="Tickets.aspx.designer.cs">
       <DependentUpon>Tickets.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="UserTicketReport.aspx.cs">
+      <DependentUpon>UserTicketReport.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="UserTicketReport.aspx.designer.cs">
+      <DependentUpon>UserTicketReport.aspx</DependentUpon>
     </Compile>
   </ItemGroup>
   <ItemGroup>

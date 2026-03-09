@@ -150,22 +150,78 @@ namespace KumariCinemas
                 using (var conn = new OracleConnection(connectionString))
                 {
                     conn.Open();
-
-                    // Block delete if customer has tickets linked
-                    var checkCmd = new OracleCommand(
-                        "SELECT COUNT(*) FROM \"TktShowHallMovCust\" WHERE CUSTOMER_ID=:id", conn);
-                    checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    int ticketCount = Convert.ToInt32(checkCmd.ExecuteScalar());
-
-                    if (ticketCount > 0)
+                    using (var transaction = conn.BeginTransaction())
                     {
-                        ShowAlert("Cannot delete: this customer has " + ticketCount + " ticket(s). Delete their tickets first.", "warning");
-                        LoadCustomerGrid(); return;
-                    }
+                        try
+                        {
+                            var cmdGetAllTickets = new OracleCommand(
+                                @"SELECT DISTINCT TICKET_ID FROM ""TktShowHallMovCust"" WHERE CUSTOMER_ID=:id", conn);
+                            cmdGetAllTickets.Transaction = transaction;
+                            cmdGetAllTickets.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            var allTicketIds = new System.Collections.Generic.List<int>();
+                            using (var reader = cmdGetAllTickets.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                    allTicketIds.Add(Convert.ToInt32(reader["TICKET_ID"]));
+                            }
 
-                    var cmd = new OracleCommand("DELETE FROM CUSTOMER WHERE CUSTOMER_ID=:id", conn);
-                    cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    cmd.ExecuteNonQuery();
+                            var cmdDeleteAllTkt = new OracleCommand(
+                                @"DELETE FROM ""TktShowHallMovCust"" WHERE CUSTOMER_ID=:id", conn);
+                            cmdDeleteAllTkt.Transaction = transaction;
+                            cmdDeleteAllTkt.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdDeleteAllTkt.ExecuteNonQuery();
+
+                            foreach (var ticketId in allTicketIds)
+                            {
+                                var cmdDeleteTicket = new OracleCommand(
+                                    "DELETE FROM TICKET WHERE TICKET_ID=:tid", conn);
+                                cmdDeleteTicket.Transaction = transaction;
+                                cmdDeleteTicket.Parameters.Add(":tid", OracleDbType.Int32).Value = ticketId;
+                                cmdDeleteTicket.ExecuteNonQuery();
+                            }
+
+                            // Delete from ShowHallMovCust for this customer
+                            var cmdShowJunction = new OracleCommand(
+                                @"DELETE FROM ""ShowHallMovCust"" WHERE CUSTOMER_ID=:id", conn);
+                            cmdShowJunction.Transaction = transaction;
+                            cmdShowJunction.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdShowJunction.ExecuteNonQuery();
+
+                            // Delete from HALL_THEATER_MOVIE_CUSTOMER
+                            var cmdHallThr = new OracleCommand(
+                                "DELETE FROM HALL_THEATER_MOVIE_CUSTOMER WHERE CUSTOMER_ID=:id", conn);
+                            cmdHallThr.Transaction = transaction;
+                            cmdHallThr.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdHallThr.ExecuteNonQuery();
+
+                            // Delete from THEATER_MOVIE_CUSTOMER
+                            var cmdThrMov = new OracleCommand(
+                                "DELETE FROM THEATER_MOVIE_CUSTOMER WHERE CUSTOMER_ID=:id", conn);
+                            cmdThrMov.Transaction = transaction;
+                            cmdThrMov.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdThrMov.ExecuteNonQuery();
+
+                            // Delete from CUSTOMER_MOVIE
+                            var cmdCustMov = new OracleCommand(
+                                "DELETE FROM CUSTOMER_MOVIE WHERE CUSTOMER_ID=:id", conn);
+                            cmdCustMov.Transaction = transaction;
+                            cmdCustMov.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdCustMov.ExecuteNonQuery();
+
+                            // Finally delete the customer
+                            var cmd = new OracleCommand("DELETE FROM CUSTOMER WHERE CUSTOMER_ID=:id", conn);
+                            cmd.Transaction = transaction;
+                            cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmd.ExecuteNonQuery();
+
+                            transaction.Commit();
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
                     ShowAlert("Customer deleted successfully!", "success");
                 }
             }

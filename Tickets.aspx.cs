@@ -244,6 +244,9 @@ namespace KumariCinemas
                             int theaterId = int.Parse(hiddenTheaterId.Value);
                             int customerId = int.Parse(dropCustomer.SelectedValue);
 
+                            // Ensure normalization chain entries exist for this customer
+                            EnsureJunctionChain(conn, customerId, movieId, theaterId, hallId);
+
                             // Apply weekend/new-release dynamic pricing
                             decimal finalPrice = CalculateDynamicPrice(conn, basePrice, showId, movieId);
 
@@ -462,6 +465,39 @@ namespace KumariCinemas
             }
         }
 
+
+        private void EnsureJunctionChain(OracleConnection conn, int customerId, int movieId, int theaterId, int hallId)
+        {
+            // Ensure CUSTOMER_MOVIE row exists
+            var cmd1 = new OracleCommand(
+                @"MERGE INTO CUSTOMER_MOVIE cm USING (SELECT :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (cm.MOVIE_ID = src.MOVIE_ID AND cm.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (MOVIE_ID, CUSTOMER_ID) VALUES (src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd1.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd1.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd1.ExecuteNonQuery();
+
+            // Ensure THEATER_MOVIE_CUSTOMER row exists
+            var cmd2 = new OracleCommand(
+                @"MERGE INTO THEATER_MOVIE_CUSTOMER tmc USING (SELECT :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (tmc.THEATER_ID = src.THEATER_ID AND tmc.MOVIE_ID = src.MOVIE_ID AND tmc.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (THEATER_ID, MOVIE_ID, CUSTOMER_ID) VALUES (src.THEATER_ID, src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd2.Parameters.Add(":tid", OracleDbType.Int32).Value = theaterId;
+            cmd2.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd2.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd2.ExecuteNonQuery();
+
+            // Ensure HALL_THEATER_MOVIE_CUSTOMER row exists
+            var cmd3 = new OracleCommand(
+                @"MERGE INTO HALL_THEATER_MOVIE_CUSTOMER htmc USING (SELECT :hid AS HALL_ID, :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (htmc.HALL_ID = src.HALL_ID AND htmc.THEATER_ID = src.THEATER_ID AND htmc.MOVIE_ID = src.MOVIE_ID AND htmc.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (HALL_ID, THEATER_ID, MOVIE_ID, CUSTOMER_ID) VALUES (src.HALL_ID, src.THEATER_ID, src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd3.Parameters.Add(":hid", OracleDbType.Int32).Value = hallId;
+            cmd3.Parameters.Add(":tid", OracleDbType.Int32).Value = theaterId;
+            cmd3.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd3.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd3.ExecuteNonQuery();
+        }
 
         private void ShowAlert(string message, string bootstrapType)
         {

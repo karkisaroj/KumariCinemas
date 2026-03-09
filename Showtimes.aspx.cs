@@ -121,9 +121,37 @@ namespace KumariCinemas
                 using (var conn = new OracleConnection(connStr))
                 {
                     conn.Open();
+
+                    // Validate that the selected hall belongs to the selected theater
+                    var cmdValidate = new OracleCommand(
+                        "SELECT COUNT(*) FROM HALL_THEATER_MOVIE_CUSTOMER WHERE HALL_ID=:hid AND THEATER_ID=:tid", conn);
+                    cmdValidate.Parameters.Add(":hid", OracleDbType.Int32).Value = int.Parse(ddlHall.SelectedValue);
+                    cmdValidate.Parameters.Add(":tid", OracleDbType.Int32).Value = int.Parse(ddlTheater.SelectedValue);
+                    int hallTheaterCount = Convert.ToInt32(cmdValidate.ExecuteScalar());
+
+                    if (hallTheaterCount == 0)
+                    {
+                        ShowAlert("The selected hall is not available in the selected theater. Please choose a valid hall-theater combination.", "warning");
+                        ShowModal = true;
+                        LoadDropdowns();
+                        LoadShowtimes();
+                        return;
+                    }
+
                     var showDate = DateTime.Parse(txtDate.Text);
                     var showTime = DateTime.Parse(txtDate.Text + " " + txtTime.Text);
                     var showEnd = DateTime.Parse(txtDate.Text + " " + txtEndTime.Text);
+
+                    int hallId = int.Parse(ddlHall.SelectedValue);
+                    int theaterId = int.Parse(ddlTheater.SelectedValue);
+                    int movieId = int.Parse(ddlMovie.SelectedValue);
+
+                    // Get the first available customer ID from database
+                    var cmdGetCustId = new OracleCommand("SELECT MIN(CUSTOMER_ID) FROM CUSTOMER", conn);
+                    var systemCustomerId = Convert.ToInt32(cmdGetCustId.ExecuteScalar());
+
+                    // Ensure normalization chain entries exist
+                    EnsureJunctionChain(conn, systemCustomerId, movieId, theaterId, hallId);
 
                     if (hfShowId.Value == "0")
                     {
@@ -139,19 +167,15 @@ namespace KumariCinemas
                         var cmdGetId = new OracleCommand("SELECT MAX(SHOW_ID) FROM SHOWTIME", conn);
                         var newShowId = Convert.ToInt32(cmdGetId.ExecuteScalar());
                         
-                        // Insert into junction table
-                        // Get the first available customer ID from database
-                        var cmdGetCustId = new OracleCommand("SELECT MIN(CUSTOMER_ID) FROM CUSTOMER", conn);
-                        var systemCustomerId = Convert.ToInt32(cmdGetCustId.ExecuteScalar());
-                        
+                        // Insert into ShowHallMovCust junction table
                         var cmdJunction = new OracleCommand(
                             "INSERT INTO \"ShowHallMovCust\" " +
                             "(SHOW_ID, HALL_ID, THEATER_ID, MOVIE_ID, CUSTOMER_ID) " +
                             "VALUES (:showId, :hallId, :theaterId, :movieId, :custId)", conn);
                         cmdJunction.Parameters.Add(":showId", OracleDbType.Int32).Value = newShowId;
-                        cmdJunction.Parameters.Add(":hallId", OracleDbType.Int32).Value = int.Parse(ddlHall.SelectedValue);
-                        cmdJunction.Parameters.Add(":theaterId", OracleDbType.Int32).Value = int.Parse(ddlTheater.SelectedValue);
-                        cmdJunction.Parameters.Add(":movieId", OracleDbType.Int32).Value = int.Parse(ddlMovie.SelectedValue);
+                        cmdJunction.Parameters.Add(":hallId", OracleDbType.Int32).Value = hallId;
+                        cmdJunction.Parameters.Add(":theaterId", OracleDbType.Int32).Value = theaterId;
+                        cmdJunction.Parameters.Add(":movieId", OracleDbType.Int32).Value = movieId;
                         cmdJunction.Parameters.Add(":custId", OracleDbType.Int32).Value = systemCustomerId;
                         cmdJunction.ExecuteNonQuery();
                         
@@ -168,17 +192,14 @@ namespace KumariCinemas
                         cmd.Parameters.Add(":id", OracleDbType.Int32).Value = int.Parse(hfShowId.Value);
                         cmd.ExecuteNonQuery();
                         
-                        // Update junction table (only rows for showtime configuration)
-                        var cmdGetCustId = new OracleCommand("SELECT MIN(CUSTOMER_ID) FROM CUSTOMER", conn);
-                        var systemCustomerId = Convert.ToInt32(cmdGetCustId.ExecuteScalar());
-                        
+                        // Update junction table
                         var cmdJunction = new OracleCommand(
                             "UPDATE \"ShowHallMovCust\" " +
                             "SET MOVIE_ID=:movieId, THEATER_ID=:theaterId, HALL_ID=:hallId " +
                             "WHERE SHOW_ID=:id AND CUSTOMER_ID = :custId", conn);
-                        cmdJunction.Parameters.Add(":movieId", OracleDbType.Int32).Value = int.Parse(ddlMovie.SelectedValue);
-                        cmdJunction.Parameters.Add(":theaterId", OracleDbType.Int32).Value = int.Parse(ddlTheater.SelectedValue);
-                        cmdJunction.Parameters.Add(":hallId", OracleDbType.Int32).Value = int.Parse(ddlHall.SelectedValue);
+                        cmdJunction.Parameters.Add(":movieId", OracleDbType.Int32).Value = movieId;
+                        cmdJunction.Parameters.Add(":theaterId", OracleDbType.Int32).Value = theaterId;
+                        cmdJunction.Parameters.Add(":hallId", OracleDbType.Int32).Value = hallId;
                         cmdJunction.Parameters.Add(":id", OracleDbType.Int32).Value = int.Parse(hfShowId.Value);
                         cmdJunction.Parameters.Add(":custId", OracleDbType.Int32).Value = systemCustomerId;
                         cmdJunction.ExecuteNonQuery();
@@ -260,15 +281,55 @@ namespace KumariCinemas
                 using (var conn = new OracleConnection(connStr))
                 {
                     conn.Open();
-                    // Delete from junction table first (foreign key constraint)
-                    var cmdJunction = new OracleCommand("DELETE FROM \"ShowHallMovCust\" WHERE SHOW_ID=:id", conn);
-                    cmdJunction.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    cmdJunction.ExecuteNonQuery();
-                    
-                    // Then delete from SHOWTIME table
-                    var cmd = new OracleCommand("DELETE FROM SHOWTIME WHERE SHOW_ID=:id", conn);
-                    cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
-                    cmd.ExecuteNonQuery();
+                    using (var transaction = conn.BeginTransaction())
+                    {
+                        try
+                        {
+                            var cmdGetTickets = new OracleCommand(
+                                @"SELECT TICKET_ID FROM ""TktShowHallMovCust"" WHERE SHOW_ID=:id", conn);
+                            cmdGetTickets.Transaction = transaction;
+                            cmdGetTickets.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            var ticketIds = new System.Collections.Generic.List<int>();
+                            using (var reader = cmdGetTickets.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                    ticketIds.Add(Convert.ToInt32(reader["TICKET_ID"]));
+                            }
+
+                            var cmdTktJunction = new OracleCommand(
+                                @"DELETE FROM ""TktShowHallMovCust"" WHERE SHOW_ID=:id", conn);
+                            cmdTktJunction.Transaction = transaction;
+                            cmdTktJunction.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdTktJunction.ExecuteNonQuery();
+
+                            foreach (var ticketId in ticketIds)
+                            {
+                                var cmdDeleteTicket = new OracleCommand(
+                                    "DELETE FROM TICKET WHERE TICKET_ID=:tid", conn);
+                                cmdDeleteTicket.Transaction = transaction;
+                                cmdDeleteTicket.Parameters.Add(":tid", OracleDbType.Int32).Value = ticketId;
+                                cmdDeleteTicket.ExecuteNonQuery();
+                            }
+
+                            var cmdJunction = new OracleCommand(
+                                @"DELETE FROM ""ShowHallMovCust"" WHERE SHOW_ID=:id", conn);
+                            cmdJunction.Transaction = transaction;
+                            cmdJunction.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmdJunction.ExecuteNonQuery();
+
+                            var cmd = new OracleCommand("DELETE FROM SHOWTIME WHERE SHOW_ID=:id", conn);
+                            cmd.Transaction = transaction;
+                            cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                            cmd.ExecuteNonQuery();
+
+                            transaction.Commit();
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
                 }
                 ShowAlert("Showtime deleted successfully!", "success");
             }
@@ -277,6 +338,39 @@ namespace KumariCinemas
                 ShowAlert("Cannot delete: " + ex.Message, "danger");
             }
             LoadShowtimes();
+        }
+
+        private void EnsureJunctionChain(OracleConnection conn, int customerId, int movieId, int theaterId, int hallId)
+        {
+            // Ensure CUSTOMER_MOVIE row exists
+            var cmd1 = new OracleCommand(
+                @"MERGE INTO CUSTOMER_MOVIE cm USING (SELECT :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (cm.MOVIE_ID = src.MOVIE_ID AND cm.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (MOVIE_ID, CUSTOMER_ID) VALUES (src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd1.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd1.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd1.ExecuteNonQuery();
+
+            // Ensure THEATER_MOVIE_CUSTOMER row exists
+            var cmd2 = new OracleCommand(
+                @"MERGE INTO THEATER_MOVIE_CUSTOMER tmc USING (SELECT :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (tmc.THEATER_ID = src.THEATER_ID AND tmc.MOVIE_ID = src.MOVIE_ID AND tmc.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (THEATER_ID, MOVIE_ID, CUSTOMER_ID) VALUES (src.THEATER_ID, src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd2.Parameters.Add(":tid", OracleDbType.Int32).Value = theaterId;
+            cmd2.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd2.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd2.ExecuteNonQuery();
+
+            // Ensure HALL_THEATER_MOVIE_CUSTOMER row exists
+            var cmd3 = new OracleCommand(
+                @"MERGE INTO HALL_THEATER_MOVIE_CUSTOMER htmc USING (SELECT :hid AS HALL_ID, :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
+                  ON (htmc.HALL_ID = src.HALL_ID AND htmc.THEATER_ID = src.THEATER_ID AND htmc.MOVIE_ID = src.MOVIE_ID AND htmc.CUSTOMER_ID = src.CUSTOMER_ID)
+                  WHEN NOT MATCHED THEN INSERT (HALL_ID, THEATER_ID, MOVIE_ID, CUSTOMER_ID) VALUES (src.HALL_ID, src.THEATER_ID, src.MOVIE_ID, src.CUSTOMER_ID)", conn);
+            cmd3.Parameters.Add(":hid", OracleDbType.Int32).Value = hallId;
+            cmd3.Parameters.Add(":tid", OracleDbType.Int32).Value = theaterId;
+            cmd3.Parameters.Add(":mid", OracleDbType.Int32).Value = movieId;
+            cmd3.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
+            cmd3.ExecuteNonQuery();
         }
 
         private void ShowAlert(string msg, string type)
