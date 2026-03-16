@@ -23,14 +23,25 @@ namespace KumariCinemas
             using (var conn = new OracleConnection(connectionString))
             {
                 conn.Open();
-                var adapter = new OracleDataAdapter(
-                    "SELECT CUSTOMER_ID, CUSTOMER_NAME FROM CUSTOMER ORDER BY CUSTOMER_NAME", conn);
+
+                // Show both name + phone so duplicate names are easy to pick.
+                // Example: Saroj (9800000001), Saroj (9800000002)
+                var adapter = new OracleDataAdapter(@"
+                    SELECT 
+                        CUSTOMER_ID,
+                        CUSTOMER_NAME || ' (' || CUSTOMER_PHONE || ')' AS DISPLAY_TEXT
+                    FROM CUSTOMER
+                    ORDER BY CUSTOMER_NAME, CUSTOMER_PHONE
+                ", conn);
+
                 var table = new DataTable();
                 adapter.Fill(table);
+
                 ddlCustomer.DataSource = table;
-                ddlCustomer.DataTextField = "CUSTOMER_NAME";
+                ddlCustomer.DataTextField = "DISPLAY_TEXT";
                 ddlCustomer.DataValueField = "CUSTOMER_ID";
                 ddlCustomer.DataBind();
+
                 ddlCustomer.Items.Insert(0, new ListItem("-- Select a Customer --", "0"));
             }
         }
@@ -69,7 +80,7 @@ namespace KumariCinemas
 
                 string ticketSql = @"
                     SELECT t.TICKET_ID,
-                           NVL(m.MOVIE_TITLE, 'N/A')   AS MOVIE_TITLE,
+                           NVL(m.MOVIE_TITLE, 'N/A')    AS MOVIE_TITLE,
                            NVL(th.THEATER_NAME, 'N/A')  AS THEATER_NAME,
                            NVL(h.HALL_NAME, 'N/A')      AS HALL_NAME,
                            t.SEAT_NO,
@@ -90,6 +101,7 @@ namespace KumariCinemas
 
                 var adapterTickets = new OracleDataAdapter(ticketSql, conn);
                 adapterTickets.SelectCommand.Parameters.Add(":custId", OracleDbType.Int32).Value = customerId;
+
                 var ticketTable = new DataTable();
                 adapterTickets.Fill(ticketTable);
 

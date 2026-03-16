@@ -155,12 +155,9 @@ namespace KumariCinemas
                 {
                     if (reader.Read())
                     {
-                        // Show the names in the read-only display boxes
                         labelMovie.Text = reader["MOVIE_TITLE"].ToString();
                         labelHall.Text = reader["HALL_NAME"].ToString();
                         labelTheater.Text = reader["THEATER_NAME"].ToString();
-
-                        // Store the IDs in hidden fields for use when saving
                         hiddenMovieId.Value = reader["MOVIE_ID"].ToString();
                         hiddenHallId.Value = reader["HALL_ID"].ToString();
                         hiddenTheaterId.Value = reader["THEATER_ID"].ToString();

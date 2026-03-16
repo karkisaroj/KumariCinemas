@@ -134,7 +134,7 @@
     function filterTable(){var i=document.getElementById("searchBox").value.toLowerCase();document.querySelectorAll(".table tbody tr").forEach(function(r){r.style.display=r.innerText.toLowerCase().includes(i)?"":"none"});}
     window.onload = function () {
         var a = document.querySelector('.alert');
-        if (a && a.innerText.trim() !== '') { setTimeout(function () { a.style.transition = 'opacity .5s'; a.style.opacity = '0'; setTimeout(function () { a.style.display = 'none'; }, 500); }, 3000); }
+        if (a && a.innerText.trim() !== '') { setTimeout(function(){a.style.transition='opacity .5s';a.style.opacity='0';setTimeout(function(){a.style.display='none';},500);},3000); }
         if (<%= ShowModal.ToString().ToLower() %>) { new bootstrap.Modal(document.getElementById('showtimeModal')).show(); }
     };
 </script>

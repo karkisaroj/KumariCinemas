@@ -179,6 +179,9 @@
       <DependentUpon>Showtimes.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="Showtimes.aspx.designer.cs">
+      <DependentUpon>Showtimes.aspx</DependentUpon>
+    </Compile>
     <Compile Include="TheaterMovieReport.aspx.cs">
       <DependentUpon>TheaterMovieReport.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
