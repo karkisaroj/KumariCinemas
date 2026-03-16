@@ -34,12 +34,14 @@
     </style>
 </head>
 <body>
+
 <nav class="navbar navbar-expand-lg kc-navbar">
     <div class="container-fluid px-3">
         <a class="navbar-brand kc-brand" href="Default.aspx">Kumari <span>Cinemas</span></a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
             <span class="navbar-toggler-icon" style="filter:invert(1)"></span>
         </button>
+
         <div class="collapse navbar-collapse" id="navMenu">
             <ul class="navbar-nav ms-auto gap-1">
                 <li class="nav-item"><a class="nav-link kc-link" href="Default.aspx"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
@@ -49,10 +51,21 @@
                 <li class="nav-item"><a class="nav-link kc-link" href="Halls.aspx"><i class="bi bi-door-open me-1"></i>Halls</a></li>
                 <li class="nav-item"><a class="nav-link kc-link" href="Showtimes.aspx"><i class="bi bi-calendar3 me-1"></i>Showtimes</a></li>
                 <li class="nav-item"><a class="nav-link kc-link" href="Tickets.aspx"><i class="bi bi-ticket-perforated me-1"></i>Tickets</a></li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link kc-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-bar-chart me-1"></i>Reports
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="UserTicketReport.aspx"><i class="bi bi-person-lines-fill me-2"></i>User Ticket Report</a></li>
+                        <li><a class="dropdown-item" href="TheaterMovieReport.aspx"><i class="bi bi-building me-2"></i>Theater Movie Report</a></li>
+                        <li><a class="dropdown-item" href="MovieOccupancyReport.aspx"><i class="bi bi-graph-up me-2"></i>Movie Occupancy Report</a></li>
+                    </ul>
+                </li>
             </ul>
         </div>
     </div>
 </nav>
+
 <form id="form1" runat="server">
 <div class="container-fluid px-4 py-4">
     <asp:Label ID="lblMessage" runat="server" Visible="false" CssClass="alert d-block mb-3"></asp:Label>
@@ -114,4 +127,4 @@
         if (<%= ShowModal.ToString().ToLower() %>) { new bootstrap.Modal(document.getElementById('theaterModal')).show(); }
     };
 </script>
-</body></html>
+</body>
