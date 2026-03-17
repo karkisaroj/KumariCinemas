@@ -61,7 +61,7 @@
     <div class="page-card">
         <div class="mb-3">
             <h4 class="page-title mb-0"><i class="bi bi-graph-up me-2"></i>Movie Occupancy Report — Top 3 Performers</h4>
-            <small class="text-muted">Select a movie to see the top 3 Theater/City/Hall combinations with the highest seat occupancy (Purchased tickets only)</small>
+            <small class="text-muted">Select a movie to see the top 3 Theater/City/Hall combinations with the highest seat occupancy Paid or Purchased tickets only</small>
         </div>
         <div class="row align-items-end mb-4">
             <div class="col-md-5">

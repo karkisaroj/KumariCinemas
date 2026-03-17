@@ -11,6 +11,9 @@ namespace KumariCinemas
         // Controls whether the Book Ticket modal stays open after postback
         public bool ShowModal = false;
 
+        // Controls whether the Edit Ticket modal stays open after postback
+        public bool ShowEditModal = false;
+
         // Database connection string from Web.config
         private readonly string connectionString = ConfigurationManager.ConnectionStrings["OracleDb"].ConnectionString;
 
@@ -72,7 +75,6 @@ namespace KumariCinemas
                     "CUSTOMER_NAME", "CUSTOMER_ID");
 
                 // Showtime dropdown — label shows Date + Time + Movie + Hall + Theater
-                // so the user knows exactly what they are picking
                 FillDropdown(dropShowtime, conn,
                     @"SELECT shmc.SHOW_ID,
                              TO_CHAR(s.SHOW_DATE, 'DD Mon YYYY') || ' ' ||
@@ -89,8 +91,10 @@ namespace KumariCinemas
                     "SHOW_LABEL", "SHOW_ID");
             }
 
-            // Reset the auto-filled display labels and hidden IDs
             ResetAutoFillFields();
+
+            // Always default Status to Booked when opening the Add modal fresh
+            dropStatus.SelectedValue = "Booked";
         }
 
         // Helper: fills any DropDownList from a SQL query
@@ -121,7 +125,6 @@ namespace KumariCinemas
 
         protected void dropShowtime_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // If user chose "-- Select --", reset everything
             if (dropShowtime.SelectedValue == "0")
             {
                 ResetAutoFillFields();
@@ -135,8 +138,6 @@ namespace KumariCinemas
             {
                 conn.Open();
 
-                // Look up the Movie, Hall, Theater linked to this Showtime
-                // via the ShowHallMovCust junction table
                 string sql = @"
                     SELECT m.MOVIE_ID,    m.MOVIE_TITLE,
                            h.HALL_ID,     h.HALL_NAME,
@@ -164,7 +165,6 @@ namespace KumariCinemas
                     }
                     else
                     {
-                        // Showtime exists but has no linked data in ShowHallMovCust yet
                         ResetAutoFillFields();
                         ShowAlert("No Movie/Hall/Theater linked to this Showtime yet.", "warning");
                     }
@@ -188,7 +188,6 @@ namespace KumariCinemas
 
         protected void btnSave_Click(object sender, EventArgs e)
         {
-            // Validate all required fields
             if (dropCustomer.SelectedValue == "0" ||
                 dropShowtime.SelectedValue == "0" ||
                 hiddenMovieId.Value == "0" ||
@@ -200,9 +199,6 @@ namespace KumariCinemas
                 ShowAlert("Please select a Showtime and Customer, then enter Seat No and Price.", "warning");
                 ShowModal = true;
                 LoadFormDropdowns();
-                // Re-select the previously chosen showtime so auto-fill stays visible
-                if (dropShowtime.Items.FindByValue(dropShowtime.SelectedValue) != null)
-                    dropShowtime.SelectedValue = dropShowtime.SelectedValue;
                 LoadTicketGrid();
                 return;
             }
@@ -225,6 +221,9 @@ namespace KumariCinemas
                 return;
             }
 
+            // Read the chosen status from the dropdown
+            string chosenStatus = dropStatus.SelectedValue;
+
             try
             {
                 using (var conn = new OracleConnection(connectionString))
@@ -234,38 +233,34 @@ namespace KumariCinemas
                     {
                         try
                         {
-                            // Read values from form
                             int showId = int.Parse(dropShowtime.SelectedValue);
                             int movieId = int.Parse(hiddenMovieId.Value);
                             int hallId = int.Parse(hiddenHallId.Value);
                             int theaterId = int.Parse(hiddenTheaterId.Value);
                             int customerId = int.Parse(dropCustomer.SelectedValue);
 
-                            // Ensure normalization chain entries exist for this customer
                             EnsureJunctionChain(conn, customerId, movieId, theaterId, hallId);
 
-                            // Apply weekend/new-release dynamic pricing
-                            decimal finalPrice = CalculateDynamicPrice(conn, basePrice, showId, movieId);
+                            decimal finalPrice = (chosenStatus == "Booked" || chosenStatus == "Purchased")
+                                ? CalculateDynamicPrice(conn, basePrice, showId, movieId)
+                                : basePrice;
 
-                            // Get next available Ticket ID
                             var idCmd = new OracleCommand("SELECT NVL(MAX(TICKET_ID), 0) + 1 FROM TICKET", conn);
                             idCmd.Transaction = transaction;
                             int newTicketId = Convert.ToInt32(idCmd.ExecuteScalar());
 
-                            // Insert the ticket row
-                            // PURCHASE_DATE uses DateTime.Now (NOT NULL column — cannot be NULL)
                             var insertTicket = new OracleCommand(
                                 @"INSERT INTO TICKET (TICKET_ID, BOOKING_TIME, PURCHASE_DATE, TICKET_STATUS, TICKET_PRICE, SEAT_NO)
-                                  VALUES (:id, :bookingTime, :purchaseDate, 'Booked', :price, :seat)", conn);
+                                  VALUES (:id, :bookingTime, :purchaseDate, :status, :price, :seat)", conn);
                             insertTicket.Transaction = transaction;
                             insertTicket.Parameters.Add(":id", OracleDbType.Int32).Value = newTicketId;
                             insertTicket.Parameters.Add(":bookingTime", OracleDbType.Date).Value = DateTime.Now;
                             insertTicket.Parameters.Add(":purchaseDate", OracleDbType.Date).Value = DateTime.Now;
+                            insertTicket.Parameters.Add(":status", OracleDbType.Varchar2).Value = chosenStatus;
                             insertTicket.Parameters.Add(":price", OracleDbType.Decimal).Value = finalPrice;
                             insertTicket.Parameters.Add(":seat", OracleDbType.Int32).Value = seatNumber;
                             insertTicket.ExecuteNonQuery();
 
-                            // Insert into junction table linking Ticket → Show/Hall/Theater/Movie/Customer
                             var insertJunction = new OracleCommand(
                                 @"INSERT INTO ""TktShowHallMovCust"" (TICKET_ID, SHOW_ID, HALL_ID, THEATER_ID, MOVIE_ID, CUSTOMER_ID)
                                   VALUES (:ticketId, :showId, :hallId, :theaterId, :movieId, :customerId)", conn);
@@ -281,7 +276,7 @@ namespace KumariCinemas
                             transaction.Commit();
 
                             string pricingNote = (finalPrice > basePrice) ? " (Weekend/New Release pricing applied)" : "";
-                            ShowAlert("Ticket #" + newTicketId + " booked! Price: Rs. " + finalPrice + pricingNote, "success");
+                            ShowAlert("Ticket #" + newTicketId + " created as " + chosenStatus + "! Price: Rs. " + finalPrice + pricingNote, "success");
                         }
                         catch
                         {
@@ -306,7 +301,6 @@ namespace KumariCinemas
         {
             try
             {
-                // Get the showtime date
                 var showCmd = new OracleCommand("SELECT SHOW_DATE FROM SHOWTIME WHERE SHOW_ID = :id", conn);
                 showCmd.Parameters.Add(":id", OracleDbType.Int32).Value = showId;
                 DateTime showDate = Convert.ToDateTime(showCmd.ExecuteScalar());
@@ -332,7 +326,7 @@ namespace KumariCinemas
             }
             catch
             {
-                return basePrice; 
+                return basePrice;
             }
         }
 
@@ -369,7 +363,6 @@ namespace KumariCinemas
                             deleteJunction.Parameters.Add(":id", OracleDbType.Int32).Value = ticketId;
                             deleteJunction.ExecuteNonQuery();
 
-                            // Then delete from ticket table
                             var deleteTicket = new OracleCommand(
                                 "DELETE FROM TICKET WHERE TICKET_ID = :id", conn);
                             deleteTicket.Transaction = transaction;
@@ -394,7 +387,13 @@ namespace KumariCinemas
 
         protected void gvTickets_RowCommand(object sender, GridViewCommandEventArgs e)
         {
-            if (e.CommandName == "CancelTicket")
+            if (e.CommandName == "EditTicket")
+            {
+                int ticketId = int.Parse(e.CommandArgument.ToString());
+                LoadEditModal(ticketId);
+                LoadTicketGrid();
+            }
+            else if (e.CommandName == "CancelTicket")
             {
                 int ticketId = int.Parse(e.CommandArgument.ToString());
                 try
@@ -433,6 +432,122 @@ namespace KumariCinemas
         }
 
 
+        // Loads existing ticket data into the Edit modal fields
+        private void LoadEditModal(int ticketId)
+        {
+            using (var conn = new OracleConnection(connectionString))
+            {
+                conn.Open();
+
+                string sql = @"
+                    SELECT t.TICKET_ID, t.SEAT_NO, t.TICKET_PRICE, t.TICKET_STATUS,
+                           NVL(c.CUSTOMER_NAME, 'N/A') AS CUSTOMER_NAME,
+                           NVL(m.MOVIE_TITLE,   'N/A') AS MOVIE_TITLE,
+                           NVL(h.HALL_NAME,     'N/A') AS HALL_NAME
+                    FROM TICKET t
+                    LEFT JOIN ""TktShowHallMovCust"" x ON t.TICKET_ID   = x.TICKET_ID
+                    LEFT JOIN CUSTOMER c               ON x.CUSTOMER_ID = c.CUSTOMER_ID
+                    LEFT JOIN MOVIE    m               ON x.MOVIE_ID    = m.MOVIE_ID
+                    LEFT JOIN HALL     h               ON x.HALL_ID     = h.HALL_ID
+                    WHERE t.TICKET_ID = :id";
+
+                var cmd = new OracleCommand(sql, conn);
+                cmd.Parameters.Add(":id", OracleDbType.Int32).Value = ticketId;
+
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        hiddenEditTicketId.Value = ticketId.ToString();
+                        txtEditSeat.Text = reader["SEAT_NO"].ToString();
+                        txtEditPrice.Text = reader["TICKET_PRICE"].ToString();
+                        dropEditStatus.SelectedValue = reader["TICKET_STATUS"].ToString();
+
+                        labelEditInfo.Text = string.Format(
+                            "<strong>Ticket #{0}</strong> &nbsp;|&nbsp; {1} &nbsp;|&nbsp; {2} &nbsp;|&nbsp; {3}",
+                            ticketId,
+                            reader["CUSTOMER_NAME"],
+                            reader["MOVIE_TITLE"],
+                            reader["HALL_NAME"]
+                        );
+                    }
+                }
+            }
+
+            ShowEditModal = true;
+        }
+
+
+        // Saves the edited Seat No, Price, and Status back to the database
+        protected void btnSaveEdit_Click(object sender, EventArgs e)
+        {
+            if (hiddenEditTicketId.Value == "0" ||
+                string.IsNullOrWhiteSpace(txtEditSeat.Text) ||
+                string.IsNullOrWhiteSpace(txtEditPrice.Text))
+            {
+                ShowAlert("Please fill in all fields.", "warning");
+                ShowEditModal = true;
+                LoadTicketGrid();
+                return;
+            }
+
+            if (!int.TryParse(txtEditSeat.Text.Trim(), out int seatNumber))
+            {
+                ShowAlert("Seat number must be a whole number (e.g. 12).", "warning");
+                ShowEditModal = true;
+                LoadTicketGrid();
+                return;
+            }
+
+            if (!decimal.TryParse(txtEditPrice.Text.Trim(), out decimal price))
+            {
+                ShowAlert("Price must be a valid number (e.g. 500).", "warning");
+                ShowEditModal = true;
+                LoadTicketGrid();
+                return;
+            }
+
+            int ticketId = int.Parse(hiddenEditTicketId.Value);
+
+            try
+            {
+                using (var conn = new OracleConnection(connectionString))
+                {
+                    conn.Open();
+                    var cmd = new OracleCommand(
+                        @"UPDATE TICKET
+                          SET SEAT_NO       = :seat,
+                              TICKET_PRICE  = :price,
+                              TICKET_STATUS = :status
+                          WHERE TICKET_ID   = :id", conn);
+
+                    cmd.Parameters.Add(":seat", OracleDbType.Int32).Value = seatNumber;
+                    cmd.Parameters.Add(":price", OracleDbType.Decimal).Value = price;
+                    cmd.Parameters.Add(":status", OracleDbType.Varchar2).Value = dropEditStatus.SelectedValue;
+                    cmd.Parameters.Add(":id", OracleDbType.Int32).Value = ticketId;
+                    cmd.ExecuteNonQuery();
+                }
+
+                ShowAlert("Ticket #" + ticketId + " updated successfully.", "success");
+            }
+            catch (Exception ex)
+            {
+                ShowAlert("Error updating ticket: " + ex.Message, "danger");
+                ShowEditModal = true;
+            }
+
+            LoadTicketGrid();
+        }
+
+
+        // Closes the Edit modal without saving
+        protected void btnCancelEdit_Click(object sender, EventArgs e)
+        {
+            ShowEditModal = false;
+            LoadTicketGrid();
+        }
+
+
         private void AutoCancelExpiredTickets()
         {
             try
@@ -457,15 +572,12 @@ namespace KumariCinemas
                     if (cancelled > 0) LoadTicketGrid();
                 }
             }
-            catch
-            {
-            }
+            catch { }
         }
 
 
         private void EnsureJunctionChain(OracleConnection conn, int customerId, int movieId, int theaterId, int hallId)
         {
-            // Ensure CUSTOMER_MOVIE row exists
             var cmd1 = new OracleCommand(
                 @"MERGE INTO CUSTOMER_MOVIE cm USING (SELECT :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
                   ON (cm.MOVIE_ID = src.MOVIE_ID AND cm.CUSTOMER_ID = src.CUSTOMER_ID)
@@ -474,7 +586,6 @@ namespace KumariCinemas
             cmd1.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
             cmd1.ExecuteNonQuery();
 
-            // Ensure THEATER_MOVIE_CUSTOMER row exists
             var cmd2 = new OracleCommand(
                 @"MERGE INTO THEATER_MOVIE_CUSTOMER tmc USING (SELECT :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
                   ON (tmc.THEATER_ID = src.THEATER_ID AND tmc.MOVIE_ID = src.MOVIE_ID AND tmc.CUSTOMER_ID = src.CUSTOMER_ID)
@@ -484,7 +595,6 @@ namespace KumariCinemas
             cmd2.Parameters.Add(":cid", OracleDbType.Int32).Value = customerId;
             cmd2.ExecuteNonQuery();
 
-            // Ensure HALL_THEATER_MOVIE_CUSTOMER row exists
             var cmd3 = new OracleCommand(
                 @"MERGE INTO HALL_THEATER_MOVIE_CUSTOMER htmc USING (SELECT :hid AS HALL_ID, :tid AS THEATER_ID, :mid AS MOVIE_ID, :cid AS CUSTOMER_ID FROM DUAL) src
                   ON (htmc.HALL_ID = src.HALL_ID AND htmc.THEATER_ID = src.THEATER_ID AND htmc.MOVIE_ID = src.MOVIE_ID AND htmc.CUSTOMER_ID = src.CUSTOMER_ID)

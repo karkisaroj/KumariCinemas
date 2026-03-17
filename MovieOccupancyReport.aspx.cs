@@ -83,7 +83,7 @@ namespace KumariCinemas
                         JOIN THEATER th   ON x.THEATER_ID  = th.THEATER_ID
                         JOIN HALL h       ON x.HALL_ID     = h.HALL_ID
                         WHERE x.MOVIE_ID = :movieId
-                          AND t.TICKET_STATUS = 'Purchased'
+                          AND (t.TICKET_STATUS = 'Purchased' OR t.TICKET_STATUS='Paid')
                           AND h.HALL_CAPACITY > 0
                         GROUP BY th.THEATER_NAME, th.THEATER_CITY, h.HALL_NAME, h.HALL_CAPACITY
                         ORDER BY OCCUPANCY_PCT DESC

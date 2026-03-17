@@ -29,6 +29,8 @@
         .search-input{padding-left:36px!important;border-radius:8px;width:300px;font-size:.87rem}
         .btn-add{background-color:#4f46e5;color:#fff;border-radius:8px;padding:9px 20px;font-size:.87rem;border:none}
         .btn-add:hover{background-color:#4338ca;color:#fff}
+        .btn-edit-row{background:#eff6ff;color:#2563eb;border:none;border-radius:6px;padding:5px 11px;font-size:.79rem}
+        .btn-edit-row:hover{background:#dbeafe}
         .btn-confirm-purchase{background:#ecfdf5;color:#059669;border:none;border-radius:6px;padding:5px 11px;font-size:.79rem}
         .btn-confirm-purchase:hover{background:#d1fae5}
         .btn-cancel-ticket{background:#fef2f2;color:#dc2626;border:none;border-radius:6px;padding:5px 11px;font-size:.79rem}
@@ -129,10 +131,10 @@
                     <asp:TemplateField HeaderText="Status">
                         <ItemTemplate>
                             <span class='<%# 
-                                Eval("TICKET_STATUS").ToString()=="Booked"         ? "badge-booked" :
-                                Eval("TICKET_STATUS").ToString()=="Purchased"      ? "badge-purchased" :
+                                Eval("TICKET_STATUS").ToString()=="Booked" ? "badge-booked" :
+                                Eval("TICKET_STATUS").ToString()=="Purchased" ? "badge-purchased" :
                                 Eval("TICKET_STATUS").ToString()=="Auto-Cancelled" ? "badge-auto-cancelled" :
-                                Eval("TICKET_STATUS").ToString()=="Cancelled"      ? "badge-cancelled" : "badge-used" 
+                                Eval("TICKET_STATUS").ToString()=="Cancelled"? "badge-cancelled" : "badge-used" 
                             %>'><%# Eval("TICKET_STATUS") %></span>
                         </ItemTemplate>
                     </asp:TemplateField>
@@ -143,7 +145,9 @@
                     </asp:TemplateField>
                     <asp:TemplateField HeaderText="Actions">
                         <ItemTemplate>
-                            <asp:Button runat="server" Text="✓ Confirm Payment" CssClass="btn btn-confirm-purchase"
+                            <asp:Button runat="server" Text="Edit" CssClass="btn btn-edit-row"
+                                CommandName="EditTicket" CommandArgument='<%# Eval("TICKET_ID") %>'/>
+                            <asp:Button runat="server" Text="✓ Confirm Payment" CssClass="btn btn-confirm-purchase ms-1"
                                 CommandName="ConfirmPurchase" CommandArgument='<%# Eval("TICKET_ID") %>'
                                 OnClientClick="return confirm('Confirm payment received for this ticket?');"
                                 Visible='<%# Eval("TICKET_STATUS").ToString()=="Booked" %>'/>
@@ -233,11 +237,73 @@
                         <asp:TextBox ID="txtPrice" runat="server" CssClass="form-control" TextMode="Number" placeholder="e.g. 500"></asp:TextBox>
                     </div>
 
+                    <div class="col-12 mb-3">
+                        <label class="form-label"><i class="bi bi-flag me-1"></i>Status</label>
+                        <asp:DropDownList ID="dropStatus" runat="server" CssClass="form-select">
+                            <asp:ListItem Text="Booked"         Value="Booked"         Selected="True"/>
+                            <asp:ListItem Text="Purchased"      Value="Purchased"/>
+                            <asp:ListItem Text="Cancelled"      Value="Cancelled"/>
+                            <asp:ListItem Text="Auto-Cancelled" Value="Auto-Cancelled"/>
+                        </asp:DropDownList>
+                    </div>
+
                 </div>
             </div>
             <div class="modal-footer">
                 <asp:Button ID="btnCancelFooter" runat="server" Text="Cancel" CssClass="btn btn-cancel-modal" OnClick="btnCancel_Click"/>
                 <asp:Button ID="btnSave" runat="server" Text="Book Ticket" CssClass="btn btn-save-modal" OnClick="btnSave_Click"/>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editTicketModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Ticket</h5>
+                <asp:Button ID="btnCancelEdit" runat="server" Text="x" CssClass="btn-close" OnClick="btnCancelEdit_Click"/>
+            </div>
+            <div class="modal-body">
+
+                <asp:HiddenField ID="hiddenEditTicketId" runat="server" Value="0" />
+
+                <div class="row">
+
+                    <div class="col-12 mb-3">
+                        <label class="form-label"><i class="bi bi-info-circle me-1"></i>Ticket Info</label>
+                        <div class="auto-fill-box">
+                            <asp:Label ID="labelEditInfo" runat="server">
+                                <span class="auto-fill-placeholder">Loading...</span>
+                            </asp:Label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><i class="bi bi-grid me-1"></i>Seat No</label>
+                        <asp:TextBox ID="txtEditSeat" runat="server" CssClass="form-control" placeholder="e.g. 12"></asp:TextBox>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><i class="bi bi-currency-rupee me-1"></i>Price (Rs.)</label>
+                        <asp:TextBox ID="txtEditPrice" runat="server" CssClass="form-control" TextMode="Number" placeholder="e.g. 500"></asp:TextBox>
+                    </div>
+
+                    <div class="col-12 mb-3">
+                        <label class="form-label"><i class="bi bi-flag me-1"></i>Status</label>
+                        <asp:DropDownList ID="dropEditStatus" runat="server" CssClass="form-select">
+                            <asp:ListItem Text="Booked"         Value="Booked"/>
+                            <asp:ListItem Text="Purchased"      Value="Purchased"/>
+                            <asp:ListItem Text="Cancelled"      Value="Cancelled"/>
+                            <asp:ListItem Text="Auto-Cancelled" Value="Auto-Cancelled"/>
+                        </asp:DropDownList>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <asp:Button ID="btnCancelEditFooter" runat="server" Text="Cancel" CssClass="btn btn-cancel-modal" OnClick="btnCancelEdit_Click"/>
+                <asp:Button ID="btnSaveEdit" runat="server" Text="Save Changes" CssClass="btn btn-save-modal" OnClick="btnSaveEdit_Click"/>
             </div>
         </div>
     </div>
@@ -264,6 +330,9 @@
         }
         if (<%= ShowModal.ToString().ToLower() %>) {
             new bootstrap.Modal(document.getElementById('ticketModal')).show();
+        }
+        if (<%= ShowEditModal.ToString().ToLower() %>) {
+            new bootstrap.Modal(document.getElementById('editTicketModal')).show();
         }
     };
 </script>
