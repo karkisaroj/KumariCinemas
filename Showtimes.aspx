@@ -61,6 +61,7 @@
         </div>
     </div>
 </nav>
+
 <form id="form1" runat="server">
 <div class="container-fluid px-4 py-4">
     <asp:Label ID="lblMessage" runat="server" Visible="false" CssClass="alert d-block mb-3"></asp:Label>
@@ -69,7 +70,9 @@
             <div><h4 class="page-title mb-0"><i class="bi bi-calendar3 me-2"></i>Showtimes</h4><small class="text-muted">Manage all movie showtimes</small></div>
             <asp:Button ID="btnShowAdd" runat="server" Text="+ Add Showtime" CssClass="btn btn-add" OnClick="btnShowAdd_Click"/>
         </div>
+
         <div class="search-wrapper mb-3"><i class="bi bi-search"></i><input type="text" id="searchBox" class="form-control search-input" placeholder="Search showtimes..." onkeyup="filterTable()"/></div>
+
         <div class="table-responsive">
             <asp:GridView ID="gvShowtimes" runat="server" CssClass="table table-hover align-middle mb-0"
                 AutoGenerateColumns="false" DataKeyNames="SHOW_ID" GridLines="None"
@@ -94,6 +97,7 @@
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="showtimeModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -101,26 +105,44 @@
                 <h5 class="modal-title fw-bold"><i class="bi bi-calendar3 me-2"></i><asp:Label ID="lblModalTitle" runat="server" Text="Add Showtime"></asp:Label></h5>
                 <asp:Button ID="btnCancel" runat="server" Text="x" CssClass="btn-close" OnClick="btnCancel_Click"/>
             </div>
+
             <div class="modal-body">
                 <asp:HiddenField ID="hfShowId" runat="server" Value="0"/>
+
                 <div class="mb-3">
                     <label class="form-label">Movie</label>
                     <asp:DropDownList ID="ddlMovie" runat="server" CssClass="form-select"></asp:DropDownList>
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label">Theater</label>
-                    <asp:DropDownList ID="ddlTheater" runat="server" CssClass="form-select"></asp:DropDownList>
+                    <!-- ✅ change: AutoPostBack + SelectedIndexChanged -->
+                    <asp:DropDownList ID="ddlTheater" runat="server" CssClass="form-select"
+                        AutoPostBack="true" OnSelectedIndexChanged="ddlTheater_SelectedIndexChanged"></asp:DropDownList>
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label">Hall</label>
                     <asp:DropDownList ID="ddlHall" runat="server" CssClass="form-select"></asp:DropDownList>
                 </div>
-                <div class="mb-3"><label class="form-label">Show Date</label><asp:TextBox ID="txtDate" runat="server" CssClass="form-control" TextMode="Date"></asp:TextBox></div>
+
+                <div class="mb-3">
+                    <label class="form-label">Show Date</label>
+                    <asp:TextBox ID="txtDate" runat="server" CssClass="form-control" TextMode="Date"></asp:TextBox>
+                </div>
+
                 <div class="row">
-                    <div class="col-6 mb-3"><label class="form-label">Start Time</label><asp:TextBox ID="txtTime" runat="server" CssClass="form-control" TextMode="Time"></asp:TextBox></div>
-                    <div class="col-6 mb-3"><label class="form-label">End Time</label><asp:TextBox ID="txtEndTime" runat="server" CssClass="form-control" TextMode="Time"></asp:TextBox></div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Start Time</label>
+                        <asp:TextBox ID="txtTime" runat="server" CssClass="form-control" TextMode="Time"></asp:TextBox>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">End Time</label>
+                        <asp:TextBox ID="txtEndTime" runat="server" CssClass="form-control" TextMode="Time"></asp:TextBox>
+                    </div>
                 </div>
             </div>
+
             <div class="modal-footer">
                 <asp:Button ID="btnCancelFooter" runat="server" Text="Cancel" CssClass="btn btn-cancel-modal" OnClick="btnCancel_Click"/>
                 <asp:Button ID="btnSave" runat="server" Text="Save Showtime" CssClass="btn btn-save-modal" OnClick="btnSave_Click"/>
@@ -128,6 +150,7 @@
         </div>
     </div>
 </div>
+
 </form>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>

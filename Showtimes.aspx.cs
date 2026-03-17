@@ -1,7 +1,8 @@
-﻿using System;
-using System.Data;
-using Oracle.ManagedDataAccess.Client;
+﻿using Oracle.ManagedDataAccess.Client;
+using System;
 using System.Configuration;
+using System.Data;
+using System.Linq;
 using System.Web.UI.WebControls;
 
 namespace KumariCinemas
@@ -54,9 +55,17 @@ namespace KumariCinemas
             using (var conn = new OracleConnection(connStr))
             {
                 conn.Open();
-                FillDDL(ddlMovie, conn, "SELECT MOVIE_ID, MOVIE_TITLE FROM MOVIE ORDER BY MOVIE_TITLE", "MOVIE_TITLE", "MOVIE_ID");
-                FillDDL(ddlTheater, conn, "SELECT THEATER_ID, THEATER_NAME FROM THEATER ORDER BY THEATER_NAME", "THEATER_NAME", "THEATER_ID");
-                FillDDL(ddlHall, conn, "SELECT HALL_ID, HALL_NAME FROM HALL ORDER BY HALL_NAME", "HALL_NAME", "HALL_ID");
+
+                FillDDL(ddlMovie, conn,
+                    "SELECT MOVIE_ID, MOVIE_TITLE FROM MOVIE ORDER BY MOVIE_TITLE",
+                    "MOVIE_TITLE", "MOVIE_ID");
+
+                FillDDL(ddlTheater, conn,
+                    "SELECT THEATER_ID, THEATER_NAME FROM THEATER ORDER BY THEATER_NAME",
+                    "THEATER_NAME", "THEATER_ID");
+                FillDDL(ddlHall, conn,
+                    "SELECT HALL_ID, HALL_NAME FROM HALL ORDER BY HALL_NAME",
+                    "HALL_NAME", "HALL_ID");
             }
         }
 
@@ -70,6 +79,72 @@ namespace KumariCinemas
             ddl.DataValueField = valueField;
             ddl.DataBind();
             ddl.Items.Insert(0, new ListItem("-- Select --", "0"));
+        }
+
+        protected void ddlTheater_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var conn = new OracleConnection(connStr))
+                {
+                    conn.Open();
+
+                    if (ddlTheater.SelectedValue == "0")
+                    {
+                        FillDDL(ddlHall, conn,
+                            "SELECT HALL_ID, HALL_NAME FROM HALL ORDER BY HALL_NAME",
+                            "HALL_NAME", "HALL_ID");
+                    }
+                    else
+                    {
+                        int theaterId = int.Parse(ddlTheater.SelectedValue);
+
+                        var sqlFiltered = @"
+                            SELECT DISTINCT h.HALL_ID, h.HALL_NAME
+                            FROM HALL h
+                            JOIN ""ShowHallMovCust"" shmc ON shmc.HALL_ID = h.HALL_ID
+                            WHERE shmc.THEATER_ID = :theaterId
+                            ORDER BY h.HALL_NAME";
+
+                        var da = new OracleDataAdapter(sqlFiltered, conn);
+                        da.SelectCommand.Parameters.Add(":theaterId", OracleDbType.Int32).Value = theaterId;
+
+                        var dt = new DataTable();
+                        da.Fill(dt);
+
+                        if (dt.Rows.Count > 0)
+                        {
+                            ddlHall.DataSource = dt;
+                            ddlHall.DataTextField = "HALL_NAME";
+                            ddlHall.DataValueField = "HALL_ID";
+                            ddlHall.DataBind();
+                            ddlHall.Items.Insert(0, new ListItem("-- Select --", "0"));
+                        }
+                        else
+                        {
+                            // fallback: show all halls (easy)
+                            FillDDL(ddlHall, conn,
+                                "SELECT HALL_ID, HALL_NAME FROM HALL ORDER BY HALL_NAME",
+                                "HALL_NAME", "HALL_ID");
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If anything goes wrong, fail safe: show all halls
+                using (var conn = new OracleConnection(connStr))
+                {
+                    conn.Open();
+                    FillDDL(ddlHall, conn,
+                        "SELECT HALL_ID, HALL_NAME FROM HALL ORDER BY HALL_NAME",
+                        "HALL_NAME", "HALL_ID");
+                }
+            }
+
+            // Keep modal open after postback
+            ShowModal = true;
+            LoadShowtimes();
         }
 
         protected void btnShowAdd_Click(object sender, EventArgs e)
@@ -117,8 +192,6 @@ namespace KumariCinemas
                     var showTime = DateTime.Parse(txtDate.Text + " " + txtTime.Text);
                     var showEnd = DateTime.Parse(txtDate.Text + " " + txtEndTime.Text);
 
-                    // Use first available customer as system placeholder
-                    // The real customer gets linked when a ticket is booked
                     var cmdCust = new OracleCommand("SELECT MIN(CUSTOMER_ID) FROM CUSTOMER", conn);
                     var custObj = cmdCust.ExecuteScalar();
                     if (custObj == null || custObj == DBNull.Value)
@@ -132,7 +205,7 @@ namespace KumariCinemas
                     {
                         try
                         {
-                            if (hfShowId.Value == "0") // NEW showtime
+                            if (hfShowId.Value == "0") 
                             {
                                 var cmdShow = new OracleCommand(
                                     "INSERT INTO SHOWTIME(SHOW_ID, SHOW_DATE, SHOW_TIME, SHOW_END_TIME) " +
@@ -160,7 +233,7 @@ namespace KumariCinemas
 
                                 ShowAlert("Showtime added successfully!", "success");
                             }
-                            else // EDIT existing showtime
+                            else 
                             {
                                 int showId = int.Parse(hfShowId.Value);
 
@@ -230,6 +303,7 @@ namespace KumariCinemas
                 }
 
                 LoadDropdowns();
+
                 var cmdJ = new OracleCommand(
                     "SELECT MOVIE_ID, THEATER_ID, HALL_ID FROM \"ShowHallMovCust\" " +
                     "WHERE SHOW_ID=:id AND ROWNUM=1", conn);
@@ -240,6 +314,8 @@ namespace KumariCinemas
                     {
                         ddlMovie.SelectedValue = r["MOVIE_ID"].ToString();
                         ddlTheater.SelectedValue = r["THEATER_ID"].ToString();
+                        ddlTheater_SelectedIndexChanged(null, EventArgs.Empty);
+
                         ddlHall.SelectedValue = r["HALL_ID"].ToString();
                     }
                 }

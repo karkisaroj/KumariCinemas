@@ -128,7 +128,6 @@ namespace KumariCinemas
                 {
                     conn.Open();
 
-                    // Block delete if theater is used in any showtime
                     var checkCmd = new OracleCommand(
                         "SELECT COUNT(*) FROM \"ShowHallMovCust\" WHERE THEATER_ID=:id", conn);
                     checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
